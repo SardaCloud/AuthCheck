@@ -1,0 +1,86 @@
+# Copyright (C) 2026 Sarda Cloud Srl, www.sardacloud.com.
+# Licensed under the MIT License. See LICENSE in the repository root.
+
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'LICENSE', 'docs/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64, x86]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Build and package
+        shell: pwsh
+        run: .\build.ps1 -Arch ${{ matrix.arch }} -Package
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: AuthCheck-win-${{ matrix.arch }}
+          path: out/AuthCheck-*-win-${{ matrix.arch }}.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  # Each package is tested on its own architecture: the unit tests (which
+  # include the structure layouts measured from the Windows SDK) run as that
+  # architecture, and the command-line contract runs the packaged exe.
+  test:
+    name: Test on ${{ matrix.arch }}
+    needs: build
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64,   runner: windows-2022 }
+          - { arch: x86,   runner: windows-2022 }
+          - { arch: arm64, runner: windows-11-arm }
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '9.0.x'
+          architecture: ${{ matrix.arch }}
+
+      - name: Unit tests
+        shell: pwsh
+        run: dotnet test tests/AuthCheck.Tests/AuthCheck.Tests.csproj -c Release --nologo
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: AuthCheck-win-${{ matrix.arch }}
+          path: pkg
+
+      - name: Unpack
+        shell: pwsh
+        run: Expand-Archive (Get-ChildItem pkg/*.zip)[0].FullName -DestinationPath kit
+
+      # A tool may exit 2 by design, and the pwsh wrapper passes on whatever
+      # $LASTEXITCODE holds, so the step ends with an explicit exit.
+      - name: Command-line contract
+        shell: pwsh
+        run: |
+          .\tests\contract.ps1 -Exe .\kit\AuthCheck.exe -SecretProbe
+          exit $LASTEXITCODE

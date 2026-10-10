@@ -1,0 +1,39 @@
+<Project>
+
+  <!--
+    Copyright (C) 2026 Sarda Cloud Srl, www.sardacloud.com.
+    Licensed under the MIT License. See LICENSE in the repository root.
+  -->
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Deterministic>true</Deterministic>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- One version for everything, read from the VERSION file at the root. -->
+  <PropertyGroup>
+    <AuthCheckVersion>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)VERSION').Trim())</AuthCheckVersion>
+    <Version>$(AuthCheckVersion)</Version>
+    <AssemblyVersion>$(AuthCheckVersion).0</AssemblyVersion>
+    <FileVersion>$(AuthCheckVersion).0</FileVersion>
+    <InformationalVersion>$(AuthCheckVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>AuthCheck</Product>
+    <Company>Sarda Cloud Srl</Company>
+    <Authors>Sarda Cloud Srl</Authors>
+    <Copyright>Copyright (C) 2026 Sarda Cloud Srl, www.sardacloud.com</Copyright>
+    <Description>Sign-in, device and management status for Windows, read from native APIs.</Description>
+    <PackageProjectUrl>https://github.com/SardaCloud/AuthCheck</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/SardaCloud/AuthCheck</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+</Project>

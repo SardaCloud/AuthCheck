@@ -1,0 +1,32 @@
+# Copyright (C) 2026 Sarda Cloud Srl, www.sardacloud.com.
+# Licensed under the MIT License. See LICENSE in the repository root.
+
+# Build output
+out/
+bin/
+obj/
+publish/
+TestResults/
+*.user
+*.suo
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+
+# Packages produced by build.ps1 -Package
+AuthCheck-*.zip
+SHA256SUMS.txt
+
+# Reports and logs: they hold user names, tenants, devices and host names
+# from a real machine and must never be committed by accident.
+*.log
+*.jsonl
+authcheck*.txt
+!docs/**
+
+# Windows
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/

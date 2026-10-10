@@ -1,0 +1,143 @@
+# Copyright (C) 2026 Sarda Cloud Srl, www.sardacloud.com.
+# Licensed under the MIT License. See LICENSE in the repository root.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, without the leading v (e.g. 1.0.0). Must match VERSION.'
+        required: true
+      draft:
+        description: 'Create the release as a draft'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: windows-2022
+    strategy:
+      fail-fast: true
+      matrix:
+        arch: [x64, arm64, x86]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Check the version
+        shell: pwsh
+        run: |
+          $v = '${{ github.event.inputs.version }}'
+          if (-not $v) { $v = '${{ github.ref_name }}' -replace '^v', '' }
+          $file = (Get-Content VERSION -Raw).Trim()
+          if ($v -ne $file) {
+            Write-Host "::error::Releasing $v, but the VERSION file says $file."
+            exit 1
+          }
+          Write-Host "Releasing AuthCheck $v"
+
+      - name: Build and package
+        shell: pwsh
+        run: .\build.ps1 -Arch ${{ matrix.arch }} -Package
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pkg-${{ matrix.arch }}
+          path: out/AuthCheck-*.zip
+          if-no-files-found: error
+
+  test:
+    name: Test on ${{ matrix.arch }}
+    needs: build
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { arch: x64,   runner: windows-2022 }
+          - { arch: x86,   runner: windows-2022 }
+          - { arch: arm64, runner: windows-11-arm }
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '9.0.x'
+          architecture: ${{ matrix.arch }}
+
+      - name: Unit tests
+        shell: pwsh
+        run: dotnet test tests/AuthCheck.Tests/AuthCheck.Tests.csproj -c Release --nologo
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: pkg-${{ matrix.arch }}
+          path: pkg
+
+      - name: Command-line contract
+        shell: pwsh
+        run: |
+          Expand-Archive (Get-ChildItem pkg/*.zip)[0].FullName -DestinationPath kit
+          .\tests\contract.ps1 -Exe .\kit\AuthCheck.exe -SecretProbe
+          exit $LASTEXITCODE
+
+  release:
+    name: Publish the release
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: pkg-*
+          path: dist
+          merge-multiple: true
+
+      - name: Work out the version
+        id: v
+        run: |
+          V='${{ github.event.inputs.version }}'
+          [ -z "$V" ] && V="${GITHUB_REF_NAME#v}"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Checksums
+        working-directory: dist
+        run: |
+          sha256sum AuthCheck-*.zip | tee SHA256SUMS.txt
+          ls -la
+
+      # The notes are this version's CHANGELOG section followed by a footer
+      # kept in docs/, with VERSION replaced.
+      - name: Release notes
+        run: |
+          V='${{ steps.v.outputs.version }}'
+          awk -v v="$V" '/^## \[/ { p = (index($0, "## [" v "]") == 1) } /^\[[0-9]/ { p = 0 } p' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "AuthCheck $V." > notes.md
+          echo >> notes.md
+          sed "s/VERSION/$V/g" docs/release-notes-footer.md >> notes.md
+          cat notes.md
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ steps.v.outputs.version }}
+          name: AuthCheck ${{ steps.v.outputs.version }}
+          body_path: notes.md
+          draft: ${{ github.event.inputs.draft == 'true' }}
+          fail_on_unmatched_files: true
+          files: |
+            dist/AuthCheck-*.zip
+            dist/SHA256SUMS.txt

@@ -1,0 +1,26 @@
+# Copyright (C) 2026 Sarda Cloud Srl, www.sardacloud.com.
+# Licensed under the MIT License. See LICENSE in the repository root.
+
+# Normalise line endings in the repository; check out native on Windows.
+* text=auto
+
+# Sources
+*.cs        text diff=csharp
+*.csproj    text
+*.props     text
+*.targets   text
+*.manifest  text
+*.ps1       text
+*.md        text
+*.yml       text
+*.json      text
+
+# Visual Studio needs CRLF in solution files
+*.sln       text eol=crlf
+
+# Binaries
+*.png       binary
+*.ico       binary
+*.exe       binary
+*.dll       binary
+*.zip       binary
